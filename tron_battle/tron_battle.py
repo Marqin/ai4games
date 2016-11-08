@@ -18,8 +18,9 @@
 
 # currently at bronze
 
-import sys
-import math
+import sys  # for sys.stderr
+import copy  # for deepcopy
+import collections  # for deque
 
 WIDTH = 30
 HEIGHT = 20
@@ -56,6 +57,28 @@ class GameMap:
         fn = [ (nx,ny) for (nx,ny) in neibs if self.get(nx,ny) < 0 ]
         return fn
 
+    def clone(self):
+        return copy.deepcopy(self)
+
+    def flood(self, startX, startY):
+        floodMap = self.clone()
+        TARGET = -1
+        REPLACE = -2
+        size = 0
+        if floodMap.get(startX, startY) != TARGET:
+            return size
+        Q = collections.deque([(startX, startY)])
+        while Q:
+            x, y = Q.popleft()
+            if floodMap.get(x,y) != TARGET:
+                continue
+            size += 1
+            #print(size, file=sys.stderr)
+            floodMap.set(x, y, REPLACE)
+            n = [fn for fn in floodMap.freeNeighbours(x, y) if floodMap.get(fn[0], fn[1]) == TARGET]
+            Q.extend(n)
+        return size
+
 ################################################################################
 
 gameMap = GameMap(WIDTH, HEIGHT)
@@ -70,7 +93,7 @@ while True:
     for i in range(n):
         x0, y0, x1, y1 = [int(j) for j in input().split()]
 
-        print(x0,y0,x1,y1, nbr, file=sys.stderr)
+        #print(x0,y0,x1,y1, nbr, file=sys.stderr)
 
         if x1 != -1:
             gameMap.set(x1, y1, i+5)
@@ -89,18 +112,13 @@ while True:
         continue
 
     max_n = 0
+    maxScore = 0
 
     for i in range(len(fn)):
-        curr = len(gameMap.freeNeighbours(fn[i][0],fn[i][1]))
-        best = len(gameMap.freeNeighbours(fn[max_n][0],fn[max_n][1]))
-        if curr > best:
+        score = gameMap.flood(*fn[i])
+        if score > maxScore:
             max_n = i
-
-    for i in range(len(fn)):
-        curr = len(gameMap.freeNeighbours(fn[i][0],fn[i][1]))
-        best = len(gameMap.freeNeighbours(fn[max_n][0],fn[max_n][1]))
-        if curr < best and curr > 1:
-            max_n = i
+            maxScore = score
 
     go_to = fn[max_n]
 
