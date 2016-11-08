@@ -24,6 +24,7 @@ import collections  # for deque
 
 WIDTH = 30
 HEIGHT = 20
+MAX_DEPTH = 4
 
 ################################################################################
 
@@ -60,6 +61,18 @@ class GameMap:
     def clone(self):
         return copy.deepcopy(self)
 
+    def __moveWest(self, w, y):
+        TARGET = -1
+        while w >= 0 and self.map[w][y] == TARGET:
+            w -= 1
+        return w+1
+
+    def __moveEast(self, e, y):
+        TARGET = -1
+        while e < WIDTH and self.map[e][y] == TARGET:
+            e += 1
+        return e ## no -1 because we use it in range() - dirty speedhack
+
     def flood(self, startX, startY):
         floodMap = self.clone()
         TARGET = -1
@@ -70,14 +83,82 @@ class GameMap:
         Q = collections.deque([(startX, startY)])
         while Q:
             x, y = Q.popleft()
-            if floodMap.get(x,y) != TARGET:
+            if floodMap.map[x][y] != TARGET:
                 continue
-            size += 1
-            #print(size, file=sys.stderr)
-            floodMap.set(x, y, REPLACE)
-            n = [fn for fn in floodMap.freeNeighbours(x, y) if floodMap.get(fn[0], fn[1]) == TARGET]
-            Q.extend(n)
+
+            for i in range(self.__moveWest(x, y), self.__moveEast(x, y)):
+                floodMap.map[i][y] = REPLACE
+                size += 1
+                if y < (HEIGHT-1) and floodMap.map[i][y+1] == TARGET:
+                    Q.append((i, y+1))
+                if y > 0 and floodMap.map[i][y-1] == TARGET:
+                    Q.append((i, y-1))
         return size
+
+################################################################################
+
+
+def moveScore(gM, x, y):
+    tmp = gameMap.get(x, y)
+    gameMap.set(x, y, -1)
+    score = gameMap.flood(x, y)
+    gameMap.set(x, y, tmp)
+    return score
+
+def minmax(gameMap, depth, playerID, maximizing, pos, enPos, alpha, beta):
+    enemyID = 0 if playerID > 0 else 1
+
+    if maximizing:
+        x, y = pos
+        fn = gameMap.freeNeighbours(x, y)
+
+        if depth == 0 or len(fn) == 0:
+            return moveScore(gameMap, x, y)
+
+        v = []
+        for n_x, n_y in fn:
+            gM = gameMap.clone()
+            gM.set(n_x, n_y, playerID)
+            alpha = max(alpha, minmax(gM, depth - 1, playerID, False, (n_x, n_y), enPos, alpha, beta))
+            if alpha >= beta:
+                break # cut beta
+        return alpha
+    else:
+        x, y = enPos
+        fn = gameMap.freeNeighbours(x, y)
+
+        if depth == 0 or len(fn) == 0:
+            x, y = pos
+            return moveScore(gameMap, x, y)
+
+        v = []
+        for n_x, n_y in fn:
+            gM = gameMap.clone()
+            gM.set(n_x, n_y, enemyID)
+
+            beta = min(beta, minmax(gM, depth - 1, playerID, True, pos, (n_x, n_y), alpha, beta))
+            if alpha >= beta:
+                break # cut alpha
+        return beta
+
+################################################################################
+
+
+def playField(gameMap, playerID, pos, enPos):
+    fn = gameMap.freeNeighbours(x, y)
+    maxV = 0
+    n = fn[0]
+    alpha, beta = float("-inf"), float("inf")
+    for n_x, n_y in fn:
+        gM = gameMap.clone()
+        gM.set(n_x, n_y, playerID)
+        v = minmax(gM, MAX_DEPTH, playerID, False, (n_x, n_y), enPos, alpha, beta)
+
+        if v > maxV:
+            maxV = v
+            n = (n_x, n_y)
+    return n
+
 
 ################################################################################
 
@@ -90,37 +171,24 @@ while True:
     n, p = [int(i) for i in input().split()]
     x, y = -1, -1
     nbr = 0
+    enX, enY = -1, -1
     for i in range(n):
+
         x0, y0, x1, y1 = [int(j) for j in input().split()]
 
-        #print(x0,y0,x1,y1, nbr, file=sys.stderr)
 
         if x1 != -1:
             gameMap.set(x1, y1, i+5)
 
         if i == p:
             x, y = x1, y1
+        else:
+            enX, enY = x1, y1
 
     if (x,y) == (-1,-1):
         break
 
-    fn = gameMap.freeNeighbours(x,y)
-
-    if len(fn) == 0:
-        print("FAILURE!!!", file=sys.stderr)
-        print("DOWN")
-        continue
-
-    max_n = 0
-    maxScore = 0
-
-    for i in range(len(fn)):
-        score = gameMap.flood(*fn[i])
-        if score > maxScore:
-            max_n = i
-            maxScore = score
-
-    go_to = fn[max_n]
+    go_to = playField(gameMap, p, (x, y), (enX, enY))
 
     if go_to[0] > x:
         print("RIGHT")
