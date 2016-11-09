@@ -46,6 +46,11 @@ def get_neighbours(x, y):
 def distance(p0, p1):
     return math.sqrt((p0[0] - p1[0])**2 + (p0[1] - p1[1])**2)
 
+#
+def getEnemy(players, playerID):
+    pl = list(players)
+    return pl[0] if pl[0] != playerID else pl[1]
+
 ################################################################################
 
 class GameMap:
@@ -79,24 +84,38 @@ class GameMap:
             e += 1
         return e ## no -1 because we use it in range() - dirty speedhack
 
-    def expand(self, start, ID):
+    def expand(self, start):
+
+        ID = self.get(*start)
         fn = self.freeNeighbours(*start)
         for x, y in fn:
             self.set(x, y, ID)
         return set(fn)
 
     def fill(self, playerID, players):
-        enemyID = 0 if playerID > 0 else 1
+        #enemyID = 0 if playerID > 0 else 1
+
+        #enemyID = getEnemy(players, playerID)
+
         gameMap = self.clone()
 
         playerPt = 0
         enemyPt = 0
 
-        gameMap.set(players[playerID][0], players[playerID][1], playerID)
-        gameMap.set(players[enemyID][0], players[enemyID][1], enemyID)
+        player = set()
+        enemy = set()
 
-        player = set([players[playerID]])#gameMap.expand(players[playerID], playerID)
-        enemy = set([players[enemyID]])#gameMap.expand(players[enemyID], enemyID)
+        for p, cord in players.items():
+            gameMap.set(cord[0], cord[1], p)
+
+            if p == playerID:
+                player.add(cord)
+            else:
+                enemy.add(cord)
+
+
+        #gameMap.expand(players[playerID], playerID)
+        #enemy = set([players[enemyID]])#gameMap.expand(players[enemyID], enemyID)
 
         while player or enemy:
 
@@ -109,7 +128,7 @@ class GameMap:
             #print("pl:" , pl, file=sys.stderr)
 
             for p in pl:
-                g = gameMap.expand(p, playerID)
+                g = gameMap.expand(p)
                 #print("pg:", p, g, file=sys.stderr)
                 player = player.union(g)
 
@@ -117,10 +136,15 @@ class GameMap:
             enemy = set()
 
             for e in en:
-                enemy = enemy.union(gameMap.expand(e, enemyID))
+                enemy = enemy.union(gameMap.expand(e))
 
         return (playerPt, enemyPt)
 
+    def clean(self, id):
+        for x in range(len(self.map)):
+            for y in range(len(self.map[x])):
+                if self.map[x][y] == 1:
+                    self.map[x][y] = -1
 
 
 
@@ -136,7 +160,9 @@ def moveScore(gM, playerID, players):
 
 
 def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
-    enemyID = 0 if playerID > 0 else 1
+
+    enemyID = getEnemy(players, playerID)
+    #enemyID = 0 if playerID > 0 else 1
 
     fn = gameMap.freeNeighbours(*players[playerID])
 
@@ -174,8 +200,13 @@ def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
 
 
 def playField(gameMap, playerID, players):
-    print("start:", players[playerID], file=sys.stderr)
+    #print("start:", players[playerID], file=sys.stderr)
     fn = gameMap.freeNeighbours(*players[playerID])
+
+    if len(fn) == 0:
+        print("Dead.", file=sys.stderr)
+        return (-1, -1)
+
     maxV = 0
     n = fn[0]
     alpha, beta = float("-inf"), float("inf")
@@ -198,11 +229,18 @@ def playField(gameMap, playerID, players):
 
 gameMap = GameMap(WIDTH, HEIGHT)
 
+stillInGame = None
+players = dict()
+
 # game loop
 while True:
     # n: total number of players (2 to 4).
     # p: your player number (0 to 3).
     n, p = [int(i) for i in input().split()]
+
+    if stillInGame == None:
+        stillInGame = [True] * n
+
     x, y = -1, -1
     nbr = 0
     enX, enY = -1, -1
@@ -210,20 +248,24 @@ while True:
 
         x0, y0, x1, y1 = [int(j) for j in input().split()]
 
-
         if x1 != -1:
+            players[i] = (x1, y1)
             gameMap.set(x1, y1, i+5)
-
-        if i == p:
-            x, y = x1, y1
         else:
-            enX, enY = x1, y1
+            if stillInGame[i]:
+                gameMap.clean(i)
+                stillInGame[i] = False
+                del players[i]
+
+    x, y = players[p]
 
     if (x,y) == (-1,-1):
+        print("I'm dead.", file=sys.stderr)
         break
 
-    en = 0 if p > 0 else 1
-    go_to = playField(gameMap, p, {p: (x, y), en: (enX, enY)})
+
+    go_to = playField(gameMap, p, players)
+    print((x,y),"->", go_to, file=sys.stderr)
 
     if go_to[0] > x:
         print("RIGHT")
