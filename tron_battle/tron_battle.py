@@ -30,17 +30,11 @@ MAX_DEPTH = 2
 
 ################################################################################
 
-# checks if given coordinate is on map
-def is_on_map(x, y):
-    if x < 0 or x >= WIDTH or y < 0 or y >= HEIGHT:
-        return False
-    return True
-
 # gives map field neighbours that are on map
 def get_neighbours(x, y):
     first_set = {(x-1, y), (x+1, y), (x, y-1), (x, y+1)}
 
-    return {(vx, vy) for (vx, vy) in first_set if is_on_map(vx, vy)}
+    return {(vx, vy) for (vx, vy) in first_set if not (vx < 0 or vx >= WIDTH or vy < 0 or vy >= HEIGHT)}
 
 # compute distance between two points
 def distance(p0, p1):
@@ -66,7 +60,7 @@ class GameMap:
 
     def freeNeighbours(self, x, y):
         neibs = get_neighbours(x,y)
-        fn = [ (nx,ny) for (nx,ny) in neibs if self.get(nx,ny) < 0 ]
+        fn = [ (nx,ny) for (nx,ny) in neibs if self.map[nx][ny] < 0 ]
         return fn
 
     def clone(self):
@@ -150,9 +144,6 @@ def moveScore(gM, playerID, players):
 
 # def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
 #
-#     enemyID = getEnemy(players, playerID)
-#     #enemyID = 0 if playerID > 0 else 1
-#
 #     fn = gameMap.freeNeighbours(*players[playerID])
 #
 #     if depth == 0 or len(fn) == 0:
@@ -171,6 +162,7 @@ def moveScore(gM, playerID, players):
 #                 break # cut beta
 #         return alpha
     # else:
+    #     enemyID = getEnemy(players, playerID)
     #     x, y = players[enemyID]
     #     fn = gameMap.freeNeighbours(x, y)
     #
@@ -208,7 +200,6 @@ def playField(gameMap, playerID, players):
         p[playerID] = (n_x, n_y)
 
         v = moveScore(gM, playerID, p)
-
         #v = minmax(gM, MAX_DEPTH, playerID, True, p , alpha, beta)
 
         if v > maxV:
@@ -218,6 +209,7 @@ def playField(gameMap, playerID, players):
 
 
 ################################################################################
+
 
 gameMap = GameMap(WIDTH, HEIGHT)
 
