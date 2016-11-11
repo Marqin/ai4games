@@ -140,10 +140,10 @@ class GameMap:
 
         return (playerPt, enemyPt)
 
-    def clean(self, id):
+    def clean(self, pid):
         for x in range(len(self.map)):
             for y in range(len(self.map[x])):
-                if self.map[x][y] == 1:
+                if self.map[x][y] == pid:
                     self.map[x][y] = -1
 
 
@@ -152,8 +152,8 @@ class GameMap:
 
 
 def moveScore(gM, playerID, players):
-    p, e = gM.fill(playerID, players)
-    score = 10000000 * p - 100000 * e - len(gM.freeNeighbours(*players[playerID]))
+    p, e, acc = gM.fill(playerID, players)
+    score = 10000 * p - 10 * e - len(gM.freeNeighbours(*players[playerID])) # + acc
 
     #print(players[playerID], p, file=sys.stderr)
     return score
@@ -177,7 +177,7 @@ def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
             p = copy.deepcopy(players)
             gM.set(n_x, n_y, playerID)
             p[playerID] = (n_x, n_y)
-            alpha = max(alpha, minmax(gM, depth - 1, playerID, False, p, alpha, beta))
+            alpha = max(alpha, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
             if alpha >= beta:
                 break # cut beta
         return alpha
@@ -202,6 +202,7 @@ def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
 def playField(gameMap, playerID, players):
     #print("start:", players[playerID], file=sys.stderr)
     fn = gameMap.freeNeighbours(*players[playerID])
+    #print("fn:", fn, file=sys.stderr)
 
     if len(fn) == 0:
         print("Dead.", file=sys.stderr)
@@ -232,6 +233,8 @@ gameMap = GameMap(WIDTH, HEIGHT)
 stillInGame = None
 players = dict()
 
+firstTurn = True
+
 # game loop
 while True:
     # n: total number of players (2 to 4).
@@ -248,14 +251,19 @@ while True:
 
         x0, y0, x1, y1 = [int(j) for j in input().split()]
 
+        if firstTurn:
+            gameMap.set(x0, y0, i)
+
         if x1 != -1:
             players[i] = (x1, y1)
-            gameMap.set(x1, y1, i+5)
+            gameMap.set(x1, y1, i)
         else:
             if stillInGame[i]:
                 gameMap.clean(i)
                 stillInGame[i] = False
                 del players[i]
+
+    firstTurn = False
 
     x, y = players[p]
 
