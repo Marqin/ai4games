@@ -89,7 +89,7 @@ class GameMap:
     def fill(self, playerID, players):
 
         startingPositions = {p: [coord] for p, coord in players.items()}
-        gameMap = self.clone()
+        #gameMap = self.clone()
 
         playerList = list(players)
         data = {pid: {} for pid in playerList}
@@ -104,9 +104,9 @@ class GameMap:
             movesThisTurn = {}
             for player in playerOrder:
                 for pos in startingPositions[player]:
-                    for n in gameMap.freeNeighbours(*pos):
+                    for n in self.freeNeighbours(*pos):
                         canExplore = True
-                        gameMap.map[pos[0]][pos[1]] = player
+                        self.map[pos[0]][pos[1]] = player
                         movesThisTurn[n] = player
             #
             for move, player in movesThisTurn.items():
