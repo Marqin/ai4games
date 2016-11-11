@@ -16,7 +16,7 @@
 #    misrepresented as being the original software.
 # 3. This notice may not be removed or altered from any source distribution.
 
-# currently at bronze
+# currently at gold
 
 import sys  # for sys.stderr
 import copy  # for deepcopy
@@ -125,7 +125,7 @@ class GameMap:
 
         playerTiles = len(data[playerID])
         enemyTiles = sum([len(data[i]) for i in playerList]) - playerTiles
-        
+
         return (playerTiles, enemyTiles)
 
 
