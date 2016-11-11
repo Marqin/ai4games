@@ -93,52 +93,41 @@ class GameMap:
         return set(fn)
 
     def fill(self, playerID, players):
-        #enemyID = 0 if playerID > 0 else 1
 
-        #enemyID = getEnemy(players, playerID)
-
+        startingPositions = {p: [coord] for p, coord in players.items()}
         gameMap = self.clone()
 
-        playerPt = 0
-        enemyPt = 0
+        playerList = list(players)
+        data = {pid: {} for pid in playerList}
 
-        player = set()
-        enemy = set()
+        playerOrder = [playerID] + [p for p in playerList if p > playerID] + [p for p in playerList if p < playerID]
 
-        for p, cord in players.items():
-            gameMap.set(cord[0], cord[1], p)
+        turnNo = 1
+        canExplore = True
 
-            if p == playerID:
-                player.add(cord)
-            else:
-                enemy.add(cord)
+        while canExplore:
+            canExplore = False
+            movesThisTurn = {}
+            for player in playerOrder:
+                for pos in startingPositions[player]:
+                    for n in gameMap.freeNeighbours(*pos):
+                        canExplore = True
+                        gameMap.map[pos[0]][pos[1]] = player
+                        movesThisTurn[n] = player
+            #
+            for move, player in movesThisTurn.items():
+                data[player][move] = turnNo
 
+            if canExplore:
+                turnNo += 1
+                startingPositions = {player: [move for move, p in movesThisTurn.items() if p == player] for player in playerList}
+        #
 
-        #gameMap.expand(players[playerID], playerID)
-        #enemy = set([players[enemyID]])#gameMap.expand(players[enemyID], enemyID)
+        playerTiles = len(data[playerID])
+        enemyTiles = sum([len(data[i]) for i in playerList]) - playerTiles
+        
+        return (playerTiles, enemyTiles)
 
-        while player or enemy:
-
-            playerPt += len(player)
-            enemyPt += len(enemy)
-
-            pl = player.copy()
-            player = set()
-
-            #print("pl:" , pl, file=sys.stderr)
-
-            for p in pl:
-                g = gameMap.expand(p)
-                #print("pg:", p, g, file=sys.stderr)
-                player = player.union(g)
-
-            en = enemy.copy()
-            enemy = set()
-
-            for e in en:
-                enemy = enemy.union(gameMap.expand(e))
-
-        return (playerPt, enemyPt)
 
     def clean(self, pid):
         for x in range(len(self.map)):
@@ -152,49 +141,49 @@ class GameMap:
 
 
 def moveScore(gM, playerID, players):
-    p, e, acc = gM.fill(playerID, players)
+    p, e = gM.fill(playerID, players)
     score = 10000 * p - 10 * e - len(gM.freeNeighbours(*players[playerID])) # + acc
 
     #print(players[playerID], p, file=sys.stderr)
     return score
 
 
-def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
-
-    enemyID = getEnemy(players, playerID)
-    #enemyID = 0 if playerID > 0 else 1
-
-    fn = gameMap.freeNeighbours(*players[playerID])
-
-    if depth == 0 or len(fn) == 0:
-        x, y = players[playerID]
-        return moveScore(gameMap, playerID, players)
-
-    if maximizing:
-        v = []
-        for n_x, n_y in fn:
-            gM = gameMap.clone()
-            p = copy.deepcopy(players)
-            gM.set(n_x, n_y, playerID)
-            p[playerID] = (n_x, n_y)
-            alpha = max(alpha, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
-            if alpha >= beta:
-                break # cut beta
-        return alpha
-    else:
-        x, y = players[enemyID]
-        fn = gameMap.freeNeighbours(x, y)
-
-        v = []
-        for n_x, n_y in fn:
-            gM = gameMap.clone()
-            p = copy.deepcopy(players)
-            gM.set(n_x, n_y, enemyID)
-            p[enemyID] = (n_x, n_y)
-            beta = min(beta, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
-            if alpha >= beta:
-                break # cut alpha
-        return beta
+# def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
+#
+#     enemyID = getEnemy(players, playerID)
+#     #enemyID = 0 if playerID > 0 else 1
+#
+#     fn = gameMap.freeNeighbours(*players[playerID])
+#
+#     if depth == 0 or len(fn) == 0:
+#         x, y = players[playerID]
+#         return moveScore(gameMap, playerID, players)
+#
+#     if maximizing:
+#         v = []
+#         for n_x, n_y in fn:
+#             gM = gameMap.clone()
+#             p = copy.deepcopy(players)
+#             gM.set(n_x, n_y, playerID)
+#             p[playerID] = (n_x, n_y)
+#             alpha = max(alpha, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
+#             if alpha >= beta:
+#                 break # cut beta
+#         return alpha
+    # else:
+    #     x, y = players[enemyID]
+    #     fn = gameMap.freeNeighbours(x, y)
+    #
+    #     v = []
+    #     for n_x, n_y in fn:
+    #         gM = gameMap.clone()
+    #         p = copy.deepcopy(players)
+    #         gM.set(n_x, n_y, enemyID)
+    #         p[enemyID] = (n_x, n_y)
+    #         beta = min(beta, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
+    #         if alpha >= beta:
+    #             break # cut alpha
+    #     return beta
 
 ################################################################################
 
@@ -218,7 +207,9 @@ def playField(gameMap, playerID, players):
 
         p[playerID] = (n_x, n_y)
 
-        v = minmax(gM, MAX_DEPTH, playerID, False, p , alpha, beta)
+        v = moveScore(gM, playerID, p)
+
+        #v = minmax(gM, MAX_DEPTH, playerID, True, p , alpha, beta)
 
         if v > maxV:
             maxV = v
