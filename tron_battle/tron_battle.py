@@ -98,16 +98,27 @@ class GameMap:
 
         turnNo = 1
         canExplore = True
+        alone = True
 
         while canExplore:
             canExplore = False
             movesThisTurn = {}
             for player in playerOrder:
                 for pos in startingPositions[player]:
-                    for n in self.freeNeighbours(*pos):
-                        canExplore = True
-                        self.map[n[0]][n[1]] = player
-                        movesThisTurn[n] = player
+
+                    nei = get_neighbours(*pos)
+
+                    for n in nei:
+                        val = self.map[n[0]][n[1]]
+                        if val < 0:
+                            canExplore = True
+                            self.map[n[0]][n[1]] = player + 10
+                            movesThisTurn[n] = player
+                        elif val >= 10 and val != playerID + 10 and player == playerID:
+                            alone = False
+
+                    #for n in self.freeNeighbours(*pos):
+
             #
             for move, player in movesThisTurn.items():
                 data[player][move] = turnNo
@@ -120,7 +131,7 @@ class GameMap:
         playerTiles = len(data[playerID])
         enemyTiles = sum([len(data[i]) for i in playerList]) - playerTiles
 
-        return (playerTiles, enemyTiles)
+        return (playerTiles, enemyTiles, alone)
 
 
     def clean(self, pid):
@@ -136,47 +147,47 @@ class GameMap:
 
 def moveScore(gM, playerID, players):
     wallhug = len(gM.freeNeighbours(*players[playerID]))
-    p, e = gM.fill(playerID, players)
+    p, e, alone = gM.fill(playerID, players)
     score = 10000 * p - 10 * e - wallhug
 
-    #print(players[playerID], p, file=sys.stderr)
-    return score
+    #print(players[playerID], score, wallhug, file=sys.stderr)
+    return (score, alone)
 
 
-# def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
-#
-#     fn = gameMap.freeNeighbours(*players[playerID])
-#
-#     if depth == 0 or len(fn) == 0:
-#         x, y = players[playerID]
-#         return moveScore(gameMap, playerID, players)
-#
-#     if maximizing:
-#         v = []
-#         for n_x, n_y in fn:
-#             gM = gameMap.clone()
-#             p = copy.deepcopy(players)
-#             gM.set(n_x, n_y, playerID)
-#             p[playerID] = (n_x, n_y)
-#             alpha = max(alpha, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
-#             if alpha >= beta:
-#                 break # cut beta
-#         return alpha
-    # else:
-    #     enemyID = getEnemy(players, playerID)
-    #     x, y = players[enemyID]
-    #     fn = gameMap.freeNeighbours(x, y)
-    #
-    #     v = []
-    #     for n_x, n_y in fn:
-    #         gM = gameMap.clone()
-    #         p = copy.deepcopy(players)
-    #         gM.set(n_x, n_y, enemyID)
-    #         p[enemyID] = (n_x, n_y)
-    #         beta = min(beta, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
-    #         if alpha >= beta:
-    #             break # cut alpha
-    #     return beta
+def minmax(gameMap, depth, playerID, maximizing, players, alpha, beta):
+
+    fn = gameMap.freeNeighbours(*players[playerID])
+
+    if depth == 0 or len(fn) == 0:
+        x, y = players[playerID]
+        return moveScore(gameMap, playerID, players)[0]
+
+    if maximizing:
+        v = []
+        for n_x, n_y in fn:
+            gM = gameMap.clone()
+            p = copy.deepcopy(players)
+            gM.set(n_x, n_y, playerID)
+            p[playerID] = (n_x, n_y)
+            alpha = max(alpha, minmax(gM, depth - 1, playerID, False, p, alpha, beta))
+            if alpha >= beta:
+                break # cut beta
+        return alpha
+    else:
+        enemyID = getEnemy(players, playerID)
+        x, y = players[enemyID]
+        fn = gameMap.freeNeighbours(x, y)
+
+        v = []
+        for n_x, n_y in fn:
+            gM = gameMap.clone()
+            p = copy.deepcopy(players)
+            gM.set(n_x, n_y, enemyID)
+            p[enemyID] = (n_x, n_y)
+            beta = min(beta, minmax(gM, depth - 1, playerID, True, p, alpha, beta))
+            if alpha >= beta:
+                break # cut alpha
+        return beta
 
 ################################################################################
 
@@ -193,6 +204,9 @@ def playField(gameMap, playerID, players):
     maxV = 0
     n = fn[0]
     alpha, beta = float("-inf"), float("inf")
+
+    alone = moveScore(gameMap.clone(), playerID, players)[1]
+
     for n_x, n_y in fn:
         gM = gameMap.clone()
         p = copy.deepcopy(players)
@@ -200,8 +214,12 @@ def playField(gameMap, playerID, players):
 
         p[playerID] = (n_x, n_y)
 
-        v = moveScore(gM, playerID, p)
-        #v = minmax(gM, MAX_DEPTH, playerID, True, p , alpha, beta)
+
+        if not alone:
+            v = minmax(gM, MAX_DEPTH, playerID, True, p , alpha, beta)
+            #v = moveScore(gM, playerID, p)[0]
+        else:
+            v = moveScore(gM, playerID, p)[0]
 
         if v > maxV:
             maxV = v
