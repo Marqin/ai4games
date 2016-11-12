@@ -135,8 +135,9 @@ class GameMap:
 
 
 def moveScore(gM, playerID, players):
+    wallhug = len(gM.freeNeighbours(*players[playerID]))
     p, e = gM.fill(playerID, players)
-    score = 10000 * p - 10 * e - len(gM.freeNeighbours(*players[playerID])) # + acc
+    score = 10000 * p - 10 * e - wallhug
 
     #print(players[playerID], p, file=sys.stderr)
     return score
