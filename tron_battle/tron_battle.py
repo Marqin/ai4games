@@ -106,7 +106,7 @@ class GameMap:
                 for pos in startingPositions[player]:
                     for n in self.freeNeighbours(*pos):
                         canExplore = True
-                        self.map[pos[0]][pos[1]] = player
+                        self.map[n[0]][n[1]] = player
                         movesThisTurn[n] = player
             #
             for move, player in movesThisTurn.items():
