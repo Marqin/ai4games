@@ -94,7 +94,7 @@ class GameMap:
         playerList = list(players)
         data = {pid: {} for pid in playerList}
 
-        playerOrder = [playerID] + [p for p in playerList if p > playerID] + [p for p in playerList if p < playerID]
+        playerOrder =  [p for p in playerList if p > playerID] + [p for p in playerList if p < playerID] + [playerID]
 
         turnNo = 1
         canExplore = True
