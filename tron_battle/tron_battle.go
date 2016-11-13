@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"sort"
 )
@@ -14,6 +15,23 @@ const (
 )
 
 var myID int = -1
+
+const maxInt = int(^uint(0) >> 1)
+const minInt = -maxInt - 1
+
+func max(a int, b int) int {
+	if a < b {
+		return b
+	}
+	return a
+}
+
+func min(a int, b int) int {
+	if a > b {
+		return b
+	}
+	return a
+}
 
 type gameMap_t [WIDTH][HEIGHT]int
 type pCoords map[int]coordinate
@@ -78,7 +96,7 @@ func (g *gameMap_t) boardValue(players pCoords) (int, bool) {
 	p, e, alone := g.getValues(players)
 	score := 10000*p - 10*e - wallhug
 
-	fmt.Fprintln(os.Stderr, players[myID], p, e, alone)
+	//fmt.Fprintln(os.Stderr, players[myID], p, e, alone)
 
 	return score, alone
 }
@@ -152,13 +170,21 @@ func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
 }
 
 func (p pCoords) getEnemy() int {
-	for id, _ := range p {
+
+	d := (WIDTH + HEIGHT) * 10.0
+	enemyID := -1
+
+	for id, coord := range p {
 		if id != myID {
-			return id
+			dist := distance(p[myID], coord)
+			if dist < d {
+				d = dist
+				enemyID = id
+			}
 		}
 	}
 
-	return 0
+	return enemyID
 }
 
 func getNextMove(g gameMap_t, players pCoords) coordinate {
@@ -166,24 +192,35 @@ func getNextMove(g gameMap_t, players pCoords) coordinate {
 
 	myPos := players[myID]
 	fn := g.getFreeNeighbours(myPos)
-	if len(fn) < 0 {
+	if len(fn) <= 0 {
+		fmt.Fprintln(os.Stderr, "No moves :(")
 		return nextMove
 	}
 
-	maxV := 0
+	maxV := minInt
+	_, alone := g.boardValue(players)
+
+	first := true
 
 	for _, n := range fn {
 		g.set(n, myID)
 		players[myID] = n
 
-		v, _ := g.boardValue(players)
+		var v int
 
-		if v > maxV {
+		if alone {
+			v, _ = g.boardValue(players)
+		} else {
+			v = minmax(g, players, MAX_DEPTH, false, minInt, maxInt)
+		}
+
+		if v > maxV || first {
 			maxV = v
 			nextMove = n
 		}
 
 		g.set(n, FREE)
+		first = false
 	}
 
 	players[myID] = myPos
@@ -207,6 +244,12 @@ func (g *gameMap_t) clean(id int) {
 			}
 		}
 	}
+}
+
+func distance(c0, c1 coordinate) float64 {
+	x := c0.x - c0.x
+	y := c0.y - c1.y
+	return math.Sqrt(float64(x*x + y*y))
 }
 
 func main() {
@@ -254,6 +297,61 @@ func main() {
 
 		nextMove := getNextMove(gameMap, players)
 
+		fmt.Fprintln(os.Stderr, players[myID], "->", nextMove)
 		fmt.Println(dirToStr(players[myID], nextMove))
 	}
+}
+
+func minmax(g gameMap_t, players pCoords, depth int, maximizing bool, alpha int, beta int) int {
+	fn := g.getFreeNeighbours(players[myID])
+
+	if depth == 0 || len(fn) <= 0 {
+		v, _ := g.boardValue(players)
+		return v
+	}
+
+	if maximizing {
+		for _, n := range fn {
+			p := players.clone()
+			g.set(n, myID)
+			p[myID] = n
+
+			alpha = max(alpha, minmax(g, p, depth-1, false, alpha, beta))
+			g.set(n, FREE)
+
+			if alpha >= beta {
+				break
+			}
+		}
+		return alpha
+	} else {
+
+		for enemyID, coord := range players {
+			if enemyID != myID {
+				fn = g.getFreeNeighbours(coord)
+				for _, n := range fn {
+					p := players.clone()
+
+					g.set(n, enemyID)
+					p[enemyID] = n
+
+					beta = min(beta, minmax(g, p, depth-1, true, alpha, beta))
+					g.set(n, FREE)
+
+					if alpha >= beta {
+						return beta
+					}
+				}
+			}
+		}
+		return beta
+	}
+}
+
+func (p pCoords) clone() pCoords {
+	pClone := make(pCoords)
+	for k, v := range p {
+		pClone[k] = v
+	}
+	return pClone
 }
