@@ -94,7 +94,7 @@ func (g *gameMap_t) preparePlayers(players pCoords) ([]int, map[int][]coordinate
 			pre = append(pre, p)
 		}
 		if p > myID {
-			order = append(pre, p)
+			order = append(order, p)
 		}
 
 		startingPositions[p] = append(startingPositions[p], pos)
