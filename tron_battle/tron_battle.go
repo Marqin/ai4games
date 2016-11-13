@@ -254,7 +254,10 @@ func distance(c0, c1 coordinate) float64 {
 
 func runGame(in *os.File) {
 
+	test := true
+
 	if in == nil {
+		test = false
 		in = os.Stdin
 	}
 
@@ -301,8 +304,12 @@ func runGame(in *os.File) {
 
 		nextMove := getNextMove(gameMap, players)
 
-		fmt.Fprintln(os.Stderr, players[myID], "->", nextMove)
-		fmt.Println(dirToStr(players[myID], nextMove))
+		if test {
+			return
+		} else {
+			fmt.Fprintln(os.Stderr, players[myID], "->", nextMove)
+			fmt.Println(dirToStr(players[myID], nextMove))
+		}
 	}
 }
 
