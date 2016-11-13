@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sort"
 )
 
@@ -77,6 +78,8 @@ func (g *gameMap_t) boardValue(players pCoords) (int, bool) {
 	p, e, alone := g.getValues(players)
 	score := 10000*p - 10*e - wallhug
 
+	fmt.Fprintln(os.Stderr, players[myID], p, e, alone)
+
 	return score, alone
 }
 
@@ -127,7 +130,7 @@ func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
 						canExplore = true
 						g.set(n, player+10)
 						movesThisTurn[n] = player
-					} else if value >= 10 && value != myID+10 && player != myID {
+					} else if value >= 10 && value != myID+10 && player == myID {
 						alone = false
 					}
 				}
