@@ -101,8 +101,8 @@ func (g *gameMap_t) boardValue(players pCoords) (int, bool) {
 	return score, alone
 }
 
-func (g *gameMap_t) preparePlayers(players pCoords) ([]int, map[int][]coordinate) {
-	startingPositions := make(map[int][]coordinate)
+func (g *gameMap_t) preparePlayers(players pCoords) ([]int, [4][]coordinate) {
+	var startingPositions [4][]coordinate
 
 	pre := make([]int, 0, 3)
 	order := make([]int, 0, 4)
@@ -115,7 +115,7 @@ func (g *gameMap_t) preparePlayers(players pCoords) ([]int, map[int][]coordinate
 			order = append(order, p)
 		}
 
-		startingPositions[p] = append(startingPositions[p], pos)
+		startingPositions[p] = []coordinate{pos}
 	}
 	sort.Ints(pre)
 	sort.Ints(order)
@@ -126,9 +126,7 @@ func (g *gameMap_t) preparePlayers(players pCoords) ([]int, map[int][]coordinate
 }
 
 func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
-	var order []int
-	var positions map[int][]coordinate
-	order, positions = g.preparePlayers(players)
+	order, positions := g.preparePlayers(players)
 
 	pFields := 0
 	eFields := 0
@@ -137,7 +135,7 @@ func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
 
 	for canExplore {
 		canExplore = false
-		movesThisTurn := make(map[coordinate]int)
+		var movesThisTurn [4][]coordinate
 
 		for _, player := range order {
 			for _, coord := range positions[player] {
@@ -147,7 +145,14 @@ func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
 					if value == FREE {
 						canExplore = true
 						g.set(n, player+10)
-						movesThisTurn[n] = player
+
+						if player == myID {
+							pFields++
+						} else {
+							eFields++
+						}
+
+						movesThisTurn[player] = append(movesThisTurn[player], n)
 					} else if value >= 10 && value != myID+10 && player == myID {
 						alone = false
 					}
@@ -155,16 +160,8 @@ func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
 			}
 		}
 
-		positions = make(map[int][]coordinate)
+		positions = movesThisTurn
 
-		for move, player := range movesThisTurn {
-			if player == myID {
-				pFields++
-			} else {
-				eFields++
-			}
-			positions[player] = append(positions[player], move)
-		}
 	}
 	return pFields, eFields, alone
 }
