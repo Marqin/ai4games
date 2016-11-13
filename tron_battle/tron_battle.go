@@ -252,7 +252,11 @@ func distance(c0, c1 coordinate) float64 {
 	return math.Sqrt(float64(x*x + y*y))
 }
 
-func main() {
+func runGame(in *os.File) {
+
+	if in == nil {
+		in = os.Stdin
+	}
 
 	players := make(pCoords)
 	stillInGame := [4]bool{true, true, true, true}
@@ -263,7 +267,7 @@ func main() {
 		// N: total number of players (2 to 4).
 		// P: your player number (0 to 3).
 		var N, P int
-		fmt.Scan(&N, &P)
+		fmt.Fscan(in, &N, &P)
 		var starting, current coordinate
 
 		for i := 0; i < N; i++ {
@@ -272,7 +276,7 @@ func main() {
 			// X1: current X coordinate of lightcycle
 			// Y1: current Y coordinate of lightcycle
 
-			fmt.Scan(&starting.x, &starting.y, &current.x, &current.y)
+			fmt.Fscan(in, &starting.x, &starting.y, &current.x, &current.y)
 
 			if myID < 0 {
 				gameMap.set(starting, i)
@@ -300,6 +304,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, players[myID], "->", nextMove)
 		fmt.Println(dirToStr(players[myID], nextMove))
 	}
+}
+
+func main() {
+	runGame(nil)
 }
 
 func minmax(g gameMap_t, players pCoords, depth int, maximizing bool, alpha int, beta int) int {
