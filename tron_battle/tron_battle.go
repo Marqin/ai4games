@@ -100,7 +100,7 @@ func (g gameMap_t) getFreeNeighbours(coord coordinate) []coordinate {
 	return freeNeighbours
 }
 
-func (g gameMap_t) get(coord coordinate) int {
+func (g *gameMap_t) get(coord coordinate) int {
 	return g[coord.x][coord.y]
 }
 
