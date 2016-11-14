@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	WIDTH     = 30
-	HEIGHT    = 20
-	MAX_DEPTH = 2
-	FREE      = -1
+	WIDTH           = 30
+	HEIGHT          = 20
+	MAX_DEPTH       = 2
+	MAX_DEPTH_ALONE = 4
+	FREE            = -1
 )
 
 var myID int = -1
@@ -39,6 +40,23 @@ type pCoords map[int]coordinate
 type coordinate struct {
 	x int
 	y int
+}
+
+type pair struct {
+	fst int
+	snd int
+}
+
+type pairSort []pair
+
+func (p pairSort) Len() int {
+	return len(p)
+}
+func (p pairSort) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+func (p pairSort) Less(i, j int) bool {
+	return p[i].fst < p[j].fst
 }
 
 func dirToStr(from coordinate, to coordinate) string {
@@ -93,12 +111,50 @@ func (g *gameMap_t) set(coord coordinate, val int) {
 func (g *gameMap_t) boardValue(players pCoords) (int, bool) {
 
 	wallhug := len(g.getFreeNeighbours(players[myID]))
-	p, e, alone := g.getValues(players)
-	score := 10000*p - 10*e - wallhug
+	fields, alone := g.getValues(players)
+	e := 0
 
-	//fmt.Fprintln(os.Stderr, players[myID], p, e, alone)
+	for p, _ := range players {
+		if p != myID {
+			e += fields[p]
+		}
+	}
+
+	score := 10000*fields[myID] - 10*e - wallhug
+	//fmt.Fprintln(os.Stderr, "normal:", players[myID], fields[myID], fields, score)
 
 	return score, alone
+}
+
+func (g *gameMap_t) boardValueAlone(players pCoords) int {
+
+	wallhug := len(g.getFreeNeighbours(players[myID]))
+	fields, _ := g.getValues(players)
+
+	worse := make([]pair, 0, 4)
+
+	for p, _ := range players {
+		if p != myID {
+			if fields[p] < fields[myID] {
+				worse = append(worse, pair{fields[p], p})
+			}
+		}
+	}
+
+	sort.Sort(pairSort(worse))
+
+	fmt.Fprintln(os.Stderr, players[myID], worse)
+
+	score := fields[myID] - wallhug
+
+	for _, worse := range worse {
+		if g.pathTo(players, worse.snd) {
+			score = 10000*fields[myID] - wallhug
+			break
+		}
+	}
+	//fmt.Fprintln(os.Stderr, "normal:", score, worse)
+	return score
 }
 
 func (g *gameMap_t) preparePlayers(players pCoords) ([]int, [4][]coordinate) {
@@ -125,11 +181,11 @@ func (g *gameMap_t) preparePlayers(players pCoords) ([]int, [4][]coordinate) {
 	return order, startingPositions
 }
 
-func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
+func (g gameMap_t) getValues(players pCoords) ([4]int, bool) {
 	order, positions := g.preparePlayers(players)
 
-	pFields := 0
-	eFields := 0
+	fields := [4]int{0, 0, 0, 0}
+
 	canExplore := true
 	alone := true
 
@@ -146,11 +202,7 @@ func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
 						canExplore = true
 						g.set(n, player+10)
 
-						if player == myID {
-							pFields++
-						} else {
-							eFields++
-						}
+						fields[player]++
 
 						movesThisTurn[player] = append(movesThisTurn[player], n)
 					} else if value >= 10 && value != myID+10 && player == myID {
@@ -163,7 +215,36 @@ func (g gameMap_t) getValues(players pCoords) (int, int, bool) {
 		positions = movesThisTurn
 
 	}
-	return pFields, eFields, alone
+	return fields, alone
+}
+
+func (g gameMap_t) pathTo(players pCoords, id int) bool {
+
+	moves := getNeighbours(players[myID])
+	var newMoves []coordinate
+
+	for len(moves) > 0 {
+		for _, move := range moves {
+
+			if g.get(move) == id {
+				return true
+			}
+
+			g.set(move, myID)
+
+			for _, n := range getNeighbours(move) {
+				if g.get(move) == id {
+					return true
+				} else if g.get(move) == FREE {
+					newMoves = append(newMoves, n)
+				}
+			}
+		}
+
+		moves = newMoves
+	}
+
+	return false
 }
 
 func (p pCoords) getEnemy() int {
@@ -203,12 +284,19 @@ func getNextMove(g gameMap_t, players pCoords) coordinate {
 		g.set(n, myID)
 		players[myID] = n
 
-		var v int
+		v := minInt
 
 		if alone {
-			v, _ = g.boardValue(players)
+			v = lookAhead(g, players, MAX_DEPTH_ALONE)
+			//v = g.boardValueAlone(players)
+			//v, _ = g.boardValue(players)
 		} else {
-			v = minmax(g, players, MAX_DEPTH, false, minInt, maxInt)
+			depth := MAX_DEPTH
+			if len(players) < 3 {
+				depth = 4
+			}
+			v = minmax(g, players, depth, false, minInt, maxInt)
+			//v, _ = g.boardValue(players)
 		}
 
 		if v > maxV || first {
@@ -366,4 +454,25 @@ func (p pCoords) clone() pCoords {
 		pClone[k] = v
 	}
 	return pClone
+}
+
+func lookAhead(g gameMap_t, players pCoords, depth int) int {
+	fn := g.getFreeNeighbours(players[myID])
+
+	if depth == 0 || len(fn) <= 0 {
+		return g.boardValueAlone(players)
+	}
+
+	maxV := minInt
+
+	for _, n := range fn {
+		p := players.clone()
+		g.set(n, myID)
+		p[myID] = n
+
+		maxV = max(maxV, lookAhead(g, p, depth-1))
+		g.set(n, FREE)
+
+	}
+	return maxV
 }
